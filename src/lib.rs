@@ -2,11 +2,52 @@ use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::os::unix::ffi::OsStrExt;
 
-type VariableName = String;
+#[derive(Hash, Eq, PartialEq)]
+pub struct VariableName(String);
+impl std::fmt::Display for VariableName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl TryFrom<String> for VariableName {
+    type Error = VariableError;
+    fn try_from(key: String) -> Result<Self, Self::Error> {
+        if key.is_empty() {
+            return Err(VariableError::TooShort);
+        }
+
+        if let Some(first_char) = key.chars().nth(0) {
+            if !"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".contains(first_char) {
+                return Err(VariableError::FirstCharNotAlphaUnder);
+            }
+        } else {
+            // ... should have caught this earlier, but belt / suspenders I guess
+            return Err(VariableError::TooShort);
+        }
+
+        if !key.chars().all(|char| {
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".contains(char)
+        }) {
+            return Err(VariableError::InvalidCharacter);
+        }
+
+        Ok(VariableName(key))
+    }
+}
+
+impl TryFrom<&str> for VariableName {
+    type Error = VariableError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        s.to_string().try_into()
+    }
+}
 
 #[derive(Debug)]
 pub enum VariableError {
     InvalidCharacter,
+    TooShort,
+    FirstCharNotAlphaUnder,
 }
 
 #[derive(Debug)]
@@ -35,7 +76,7 @@ pub fn escape(
 ) -> Result<OsString, DataError> {
     let mut out = OsString::new();
 
-    let enc: &dyn Fn(&str, &OsStr) -> Result<OsString, DataError> = match target {
+    let enc: &dyn Fn(&VariableName, &OsStr) -> Result<OsString, DataError> = match target {
         Encoding::PosixShell => &escape_sh,
         Encoding::Fish => &escape_fish,
         Encoding::Elvish => &escape_elvish,
@@ -52,7 +93,7 @@ pub fn escape(
     Ok(out)
 }
 
-pub(crate) fn escape_sh(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_sh(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     let mut out = OsString::new();
 
     out.push(format!("export {var}='"));
@@ -75,7 +116,7 @@ pub(crate) fn escape_sh(var: &str, value: &OsStr) -> Result<OsString, DataError>
     Ok(out)
 }
 
-pub(crate) fn escape_fish(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_fish(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     // Presumably, fish handles things that aren't UTF-8... but Fish uses Unicode's
     // "noncharacters" for in-band signalling. Because of that, we actually have to
     // examine this data in terms of unicode characters.
@@ -112,7 +153,7 @@ pub(crate) fn escape_fish(var: &str, value: &OsStr) -> Result<OsString, DataErro
     Ok(out)
 }
 
-pub(crate) fn escape_elvish(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_elvish(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
@@ -142,7 +183,7 @@ pub(crate) fn escape_elvish(var: &str, value: &OsStr) -> Result<OsString, DataEr
     Ok(out)
 }
 
-pub(crate) fn escape_powershell(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_powershell(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
@@ -183,7 +224,7 @@ pub(crate) fn escape_powershell(var: &str, value: &OsStr) -> Result<OsString, Da
     Ok(out)
 }
 
-pub(crate) fn escape_ion(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_ion(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
@@ -216,7 +257,7 @@ pub(crate) fn escape_ion(var: &str, value: &OsStr) -> Result<OsString, DataError
     Ok(out)
 }
 
-pub(crate) fn escape_nushell(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_nushell(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
@@ -247,7 +288,7 @@ pub(crate) fn escape_nushell(var: &str, value: &OsStr) -> Result<OsString, DataE
     Ok(out)
 }
 
-pub(crate) fn escape_tcsh(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_tcsh(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     let mut out: OsString = OsString::new();
 
     out.push(format!("setenv {var} '"));
@@ -278,7 +319,7 @@ pub(crate) fn escape_tcsh(var: &str, value: &OsStr) -> Result<OsString, DataErro
     Ok(out)
 }
 
-pub(crate) fn escape_rc(var: &str, value: &OsStr) -> Result<OsString, DataError> {
+pub(crate) fn escape_rc(var: &VariableName, value: &OsStr) -> Result<OsString, DataError> {
     let mut out: OsString = OsString::new();
 
     out.push(format!("{var}='"));
@@ -458,8 +499,10 @@ mod tests {
         };
 
         for (label, sample) in corpus.into_iter() {
-            let escaped = match escape(encoding, HashMap::from([("MYVAR".into(), sample.clone())]))
-            {
+            let escaped = match escape(
+                encoding,
+                HashMap::from([("MYVAR".try_into().unwrap(), sample.clone())]),
+            ) {
                 Err(e) => {
                     println!("Skipping {label}: {e:?}");
                     continue;
