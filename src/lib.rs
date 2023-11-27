@@ -43,17 +43,23 @@ impl TryFrom<&str> for VariableName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum VariableError {
+    #[error("The variable name has an invalid character. The name must be a-zA-Z0-9_.")]
     InvalidCharacter,
+    #[error("The variable name is empty.")]
     TooShort,
+    #[error("The variable name must start with a-zA-Z_.")]
     FirstCharNotAlphaUnder,
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum DataError {
+    #[error("The data included a null byte.")]
     NullByte,
+    #[error("The data was not UTF-8")]
     NotUtf8,
+    #[error("The encoding target does not support some of the characters in the data.")]
     OutOfRange,
 }
 
@@ -124,7 +130,7 @@ pub(crate) fn escape_fish(var: &VariableName, value: &OsStr) -> Result<OsString,
     // Note: an OSString can actually contain null bytes. Check before we convert
     // it to a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
-        return Err(DataError::OutOfRange);
+        return Err(DataError::NullByte);
     }
     let value = value.to_str().ok_or(DataError::NotUtf8)?;
 
@@ -157,7 +163,7 @@ pub(crate) fn escape_elvish(var: &VariableName, value: &OsStr) -> Result<OsStrin
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
-        return Err(DataError::OutOfRange);
+        return Err(DataError::NullByte);
     }
     let value = value.to_str().ok_or(DataError::NotUtf8)?;
 
@@ -187,7 +193,7 @@ pub(crate) fn escape_powershell(var: &VariableName, value: &OsStr) -> Result<OsS
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
-        return Err(DataError::OutOfRange);
+        return Err(DataError::NullByte);
     }
     let value = value.to_str().ok_or(DataError::NotUtf8)?;
 
@@ -228,7 +234,7 @@ pub(crate) fn escape_ion(var: &VariableName, value: &OsStr) -> Result<OsString, 
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
-        return Err(DataError::OutOfRange);
+        return Err(DataError::NullByte);
     }
     let value = value.to_str().ok_or(DataError::NotUtf8)?;
 
@@ -238,7 +244,7 @@ pub(crate) fn escape_ion(var: &VariableName, value: &OsStr) -> Result<OsString, 
 
     for byte in value.as_bytes() {
         if byte == &0x00 {
-            return Err(DataError::OutOfRange);
+            return Err(DataError::NullByte);
         }
 
         if byte == &b'{' // BLNS#445 @{[system "touch /tmp/blns.fail"]}
@@ -261,7 +267,7 @@ pub(crate) fn escape_nushell(var: &VariableName, value: &OsStr) -> Result<OsStri
     // Note: an OSString can actually contain null bytes, evidently. Check before we convert it to
     // a string, which seems to ignore or stop at null bytes.
     if value.as_bytes().iter().any(|byte| byte == &b'\0') {
-        return Err(DataError::OutOfRange);
+        return Err(DataError::NullByte);
     }
     let value = value.to_str().ok_or(DataError::NotUtf8)?;
 
@@ -271,7 +277,7 @@ pub(crate) fn escape_nushell(var: &VariableName, value: &OsStr) -> Result<OsStri
 
     for byte in value.as_bytes() {
         if byte == &0x00 {
-            return Err(DataError::OutOfRange);
+            return Err(DataError::NullByte);
         }
 
         if byte == &b'\'' {
