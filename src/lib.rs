@@ -75,6 +75,45 @@ pub enum Encoding {
     Tcsh,
 }
 
+impl Encoding {
+    pub fn try_from_shell_path(p: &std::path::Path) -> Result<Self, EncodingError> {
+        let Some(filename) = p.file_name() else {
+            return Err(EncodingError::NoFileName);
+        };
+
+        let Some(filename_str) = filename.to_str() else {
+            return Err(EncodingError::NotUtf8);
+        };
+
+        match filename_str {
+            "ash" => Ok(Encoding::PosixShell),
+            "dash" => Ok(Encoding::PosixShell),
+            "bash" => Ok(Encoding::PosixShell),
+            "sh" => Ok(Encoding::PosixShell),
+            "ksh" => Ok(Encoding::PosixShell),
+            "zsh" => Ok(Encoding::PosixShell),
+            "fish" => Ok(Encoding::Fish),
+            "elvish" => Ok(Encoding::Elvish),
+            "ion" => Ok(Encoding::Ion),
+            "nu" => Ok(Encoding::NuShell),
+            "pwsh" => Ok(Encoding::PowerShell),
+            "rc" => Ok(Encoding::Rc),
+            "tcsh" => Ok(Encoding::Tcsh),
+            _ => Err(EncodingError::Unknown(filename_str.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EncodingError {
+    #[error("The provided PATH has no file name")]
+    NoFileName,
+    #[error("The filename is not UTF-8")]
+    NotUtf8,
+    #[error("The shell {0} is unknown")]
+    Unknown(String),
+}
+
 pub fn escape(
     target: Encoding,
     data: impl IntoIterator<Item = (VariableName, OsString)>,
