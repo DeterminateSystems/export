@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::os::unix::ffi::OsStrExt;
 
@@ -78,7 +77,7 @@ pub enum Encoding {
 
 pub fn escape(
     target: Encoding,
-    data: HashMap<VariableName, OsString>,
+    data: impl IntoIterator<Item = (VariableName, OsString)>,
 ) -> Result<OsString, DataError> {
     let mut out = OsString::new();
 
@@ -354,6 +353,7 @@ pub(crate) fn escape_rc(var: &VariableName, value: &OsStr) -> Result<OsString, D
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::ffi::OsString;
     use std::fs::File;
     use std::io::{BufWriter, Write};
