@@ -78,18 +78,13 @@ pub enum Encoding {
 
 impl std::fmt::Display for Encoding {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Encoding::PosixShell => "POSIX shell (ash, dash, bash, ksh, zsh, sh, etc.)",
-            Encoding::Fish => "Fish",
-            Encoding::Elvish => "Elvish",
-            Encoding::Ion => "Ion",
-            Encoding::NuShell => "Nu",
-            Encoding::PowerShell => "PowerShell",
-            Encoding::Rc => "rc",
-            Encoding::Tcsh => "TCSH",
-        })
-    }
+        use clap::ValueEnum;
 
+        match self.to_possible_value() {
+            Some(v) => write!(f, "{}", v.get_name()),
+            None => write!(f, "{:?}", self)
+        }
+    }
 }
 
 impl Encoding {
