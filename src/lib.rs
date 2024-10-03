@@ -76,6 +76,22 @@ pub enum Encoding {
     Tcsh,
 }
 
+impl std::fmt::Display for Encoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Encoding::PosixShell => "POSIX shell (ash, dash, bash, ksh, zsh, sh, etc.)",
+            Encoding::Fish => "Fish",
+            Encoding::Elvish => "Elvish",
+            Encoding::Ion => "Ion",
+            Encoding::NuShell => "Nu",
+            Encoding::PowerShell => "PowerShell",
+            Encoding::Rc => "rc",
+            Encoding::Tcsh => "TCSH",
+        })
+    }
+
+}
+
 impl Encoding {
     pub fn try_from_shell_path(p: &std::path::Path) -> Result<Self, EncodingError> {
         let Some(filename) = p.file_name() else {
