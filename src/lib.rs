@@ -62,7 +62,8 @@ pub enum DataError {
     OutOfRange,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Encoding {
     /// Ash, dash, bash, ksh, zsh
     PosixShell,
@@ -92,6 +93,7 @@ impl Encoding {
             "sh" => Ok(Encoding::PosixShell),
             "ksh" => Ok(Encoding::PosixShell),
             "zsh" => Ok(Encoding::PosixShell),
+
             "fish" => Ok(Encoding::Fish),
             "elvish" => Ok(Encoding::Elvish),
             "ion" => Ok(Encoding::Ion),

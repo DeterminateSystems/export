@@ -14,3 +14,7 @@ tempfile = "3.8.1"
 
 [dependencies]
 thiserror = "1.0.50"
+clap = { version = "4.5.17", features = ["derive"], optional = true }
+
+[features]
+clap = [ "dep:clap" ]
