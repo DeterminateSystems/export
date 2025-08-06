@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::os::unix::ffi::OsStrExt;
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct VariableName(String);
 impl std::fmt::Display for VariableName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -63,7 +62,8 @@ pub enum DataError {
     OutOfRange,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum Encoding {
     /// Ash, dash, bash, ksh, zsh
     PosixShell,
@@ -76,9 +76,60 @@ pub enum Encoding {
     Tcsh,
 }
 
+impl std::fmt::Display for Encoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use clap::ValueEnum;
+
+        match self.to_possible_value() {
+            Some(v) => write!(f, "{}", v.get_name()),
+            None => write!(f, "{:?}", self)
+        }
+    }
+}
+
+impl Encoding {
+    pub fn try_from_shell_path(p: &std::path::Path) -> Result<Self, EncodingError> {
+        let Some(filename) = p.file_name() else {
+            return Err(EncodingError::NoFileName);
+        };
+
+        let Some(filename_str) = filename.to_str() else {
+            return Err(EncodingError::NotUtf8);
+        };
+
+        match filename_str {
+            "ash" => Ok(Encoding::PosixShell),
+            "dash" => Ok(Encoding::PosixShell),
+            "bash" => Ok(Encoding::PosixShell),
+            "sh" => Ok(Encoding::PosixShell),
+            "ksh" => Ok(Encoding::PosixShell),
+            "zsh" => Ok(Encoding::PosixShell),
+
+            "fish" => Ok(Encoding::Fish),
+            "elvish" => Ok(Encoding::Elvish),
+            "ion" => Ok(Encoding::Ion),
+            "nu" => Ok(Encoding::NuShell),
+            "pwsh" => Ok(Encoding::PowerShell),
+            "rc" => Ok(Encoding::Rc),
+            "tcsh" => Ok(Encoding::Tcsh),
+            _ => Err(EncodingError::Unknown(filename_str.to_string())),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EncodingError {
+    #[error("The provided path has no file name")]
+    NoFileName,
+    #[error("The filename is not UTF-8")]
+    NotUtf8,
+    #[error("The shell {0} is unknown")]
+    Unknown(String),
+}
+
 pub fn escape(
     target: Encoding,
-    data: HashMap<VariableName, OsString>,
+    data: impl IntoIterator<Item = (VariableName, OsString)>,
 ) -> Result<OsString, DataError> {
     let mut out = OsString::new();
 
@@ -354,6 +405,7 @@ pub(crate) fn escape_rc(var: &VariableName, value: &OsStr) -> Result<OsString, D
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::ffi::OsString;
     use std::fs::File;
     use std::io::{BufWriter, Write};
