@@ -119,7 +119,7 @@ impl Encoding {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EncodingError {
-    #[error("The provided PATH has no file name")]
+    #[error("The provided path has no file name")]
     NoFileName,
     #[error("The filename is not UTF-8")]
     NotUtf8,
